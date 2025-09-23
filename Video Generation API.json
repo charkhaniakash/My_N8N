@@ -1,0 +1,563 @@
+{
+  "name": "Video Generation API",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Go 2 Market",
+        "formDescription": "Give us a product photo, title, and description, and we'll get back to you with professional marketing materials.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Product Photo",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Product Title",
+              "placeholder": "Ball",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Product Description",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "Enter your email id",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cc6121c7-de4a-445c-a810-247ea6db2fae",
+      "name": "On form submission",
+      "webhookId": "e97fa42c-fbc0-4374-addf-005ee1693c2c"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "Product_Photo",
+        "name": "={{ $json['Product Title'] }}(Orignal)",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "14oHwoVqCLoh0CUdYZnb7FYNMAdWGtVOJ",
+          "mode": "list",
+          "cachedResultName": "Product Image",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/14oHwoVqCLoh0CUdYZnb7FYNMAdWGtVOJ"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        160,
+        0
+      ],
+      "id": "72b2ff99-00b0-4645-a5f2-065bae4696f5",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "jzUe8g7GkDeemQF5",
+          "name": "signup.bot789@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Product :- {{ $('On form submission').item.json['Product Title'] }}\nDescription :- {{ $('On form submission').item.json['Product Description'] }}",
+        "options": {
+          "systemMessage": "=# Overview\nYou are a world-class marketing strategist and an expert text-to-image prompt engineer specializing in creating hyper-realistic, high-quality product photography prompts for AI image generation models.\n\nYour Objective:\nWhen given a product description, your task is to craft a detailed, professional prompt that results in a hyper-realistic, clean, and visually stunning product image suitable for marketing material, advertising campaigns, or e-commerce platforms.\n\nKey Requirements:\n\nFocus on hyper-realistic, professional studio photography.\n\nMaintain a clean, minimalistic, and elegant visual style.\n\nHighlight the product as the main subject with sharp detail and perfect lighting.\n\nUse backgrounds that complement but do not overpower the product (e.g., soft gradient, light-colored, pure white).\n\nInclude professional lighting details such as \"softbox lighting\", \"studio lights\", or \"natural soft shadows\".\n\nEmphasize realism, texture, and color accuracy.\n\nMaintain a high-end, premium look and feel.\n\nIf applicable, suggest a subtle setting that enhances the product's story (e.g., a luxury kitchen counter for a high-end blender).\n\nOutput Format:\n\nWrite a single text-to-image prompt optimized for a professional AI image model.\n\nBe direct and descriptive without using excessive words.\n\nAvoid unnecessary repetition or adjectives that do not enhance the image quality.\n\nEnsure the prompt is complete and ready for direct input into an AI model.\n\nTone:\nProfessional, precise, clean, and optimized for maximum realism and marketing impact.\n\nExample Input:\n\"A premium wireless Bluetooth speaker in matte black, cylindrical shape, modem design.\"\n\nExample Output:\n\"Movement: A product photo of a premium matte black wireless Bluetooth speaker with a cylindrical\"\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        320,
+        0
+      ],
+      "id": "92bdcc68-2ad7-49e4-a707-2b9636676038",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-chat-v3.1:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        320,
+        176
+      ],
+      "id": "8f0c8afa-c0c7-47f1-90ea-8ea479b28462",
+      "name": "Deepseek AI Brain",
+      "credentials": {
+        "openRouterApi": {
+          "id": "DCRe34xnnrSN9MBx",
+          "name": "OpenRouter n8n"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Upload file').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        640,
+        0
+      ],
+      "id": "6b4ea732-f851-4bd5-b7c5-06dce1bd5eb7",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "jzUe8g7GkDeemQF5",
+          "name": "signup.bot789@gmail.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "Here the reason i used download file is ,actually we are getting the binary image from form submission , so first will upload the image ion google drive later will download it ",
+        "height": 112,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -80,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "2a09a93b-b0fd-4ded-a99a-2f07972782e3",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $('AI Agent').item.json.output }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        0
+      ],
+      "id": "ba92ccf1-d35a-48cc-b656-6b93736c8a5c",
+      "name": "Image Generation",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Q4uROZcftujMyERv",
+          "name": "Open Ai"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "base64_json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1056,
+        0
+      ],
+      "id": "438cd15f-d608-49af-bbc5-63fe90326f1b",
+      "name": "Convert base64 to binary data"
+    },
+    {
+      "parameters": {
+        "content": "So next we need to create the video from image , to create video from image , we are using Runway ai , i will take https image. to convert image from binary to https we will be using ",
+        "height": 112,
+        "width": 320
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1104,
+        -144
+      ],
+      "typeVersion": 1,
+      "id": "a4c492f4-bcc4-4660-9e61-7b11839d1814",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgbb.com/1/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "date"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        288
+      ],
+      "id": "65f2591a-b242-46b5-ba23-e43678107e67",
+      "name": "Get https URL",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "u6ivxUQwyT2OLEE7",
+          "name": "Query Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dev.runwayml.com/v1/image_to_video",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Runway-Version",
+              "value": "2024-11-06"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "promptImage",
+              "value": "https image url"
+            },
+            {
+              "name": "promptText",
+              "value": "user prompt"
+            },
+            {
+              "name": "model",
+              "value": "gen4_turbo"
+            },
+            {
+              "name": "ratio",
+              "value": "1280:720"
+            },
+            {
+              "name": "duration",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        288
+      ],
+      "id": "320b30b5-71dc-4f03-b304-811b090a24d3",
+      "name": "Runway for converting video",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bPon6eU41El51ojV",
+          "name": "Runway"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c699dd3c-dcbe-48b5-a236-0b6c44f206e3",
+              "leftValue": "status",
+              "rightValue": "RUNNING",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        288
+      ],
+      "id": "2f25877f-a985-42a9-9bbc-5830ee62272e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "signup.bot789@gmail.com",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1424,
+        304
+      ],
+      "id": "a6a5974f-d352-4f8f-965d-a391420e129d",
+      "name": "Send a message",
+      "webhookId": "bc366c2e-a213-4a2c-94b8-e9a1e0eaa459",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "5gNphVnQVdnRE1OK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.dev.runwayml.com/v1/tasks/{get_id_from_previous}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        992,
+        288
+      ],
+      "id": "b4fc56d3-68c4-4845-b32f-b235cae0f747",
+      "name": "Get Video",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "V1GR7AeTzXK6PagZ",
+          "name": "Tavily"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        480
+      ],
+      "id": "7e701242-4c6d-4d78-afa1-576e9e1f38e6",
+      "name": "Polling",
+      "webhookId": "13e08975-6ddc-46c2-8a5f-f5bfefa9c369"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deepseek AI Brain": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Image Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Generation": {
+      "main": [
+        [
+          {
+            "node": "Convert base64 to binary data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert base64 to binary data": {
+      "main": [
+        [
+          {
+            "node": "Get https URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get https URL": {
+      "main": [
+        [
+          {
+            "node": "Runway for converting video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Runway for converting video": {
+      "main": [
+        [
+          {
+            "node": "Get Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Polling",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polling": {
+      "main": [
+        [
+          {
+            "node": "Get Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "59d26bb9-48c7-40e7-bb40-d73da4d2a4cd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3961c2df2b9c1903028e5654c7a909114a8fac8449405ddc90cbcf549cf117ab"
+  },
+  "id": "EpY9NiNbQc7wiVui",
+  "tags": []
+}
