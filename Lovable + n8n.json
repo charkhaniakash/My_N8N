@@ -1,0 +1,176 @@
+{
+  "name": "Lovable + n8n",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "c6a06432-313e-4f9e-94d0-43439e6d5e25",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dfce8989-9c1a-4f42-8a5f-028ac5fc287f",
+      "name": "Webhook",
+      "webhookId": "c6a06432-313e-4f9e-94d0-43439e6d5e25"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=The Problem is {{ $json.body.problem }}\nThe Ton eis {{ $json.body.tone }}",
+        "options": {
+          "systemMessage": "=#Overview\n\nYou are an AI Excuse Generator. Your job is to create clever, creative, and context-appropriate excuses that someone could use to avoid or get out of a situation.\n\n#Output\n\nOnly return the excuse\nAdd a touch of humor to the excuses.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "1edfb593-1fe9-46c5-a7f3-58b5c2a60760",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        96,
+        176
+      ],
+      "id": "518d3eb3-cc9d-41ac-a21a-70134c622943",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "KOPWnRfLoZHcVM4O",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        0
+      ],
+      "id": "90ddd4b0-644b-4614-a453-32115ea24509",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        352,
+        144
+      ],
+      "id": "16040078-c72d-46c6-a41b-dc646bb81dae",
+      "name": "Markdown"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        560,
+        144
+      ],
+      "id": "a5716ad1-55dd-4208-af3d-ae30df2f0b32",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "content": "Here is the App link please test here :-\n\nhttps://akashn8napp.lovable.app/",
+        "height": 80,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -128
+      ],
+      "id": "340362e8-79b8-4a26-8dd8-a9f1a1eea5d6",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "17d3db4a-da96-4d97-9d77-04fa88648497",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3961c2df2b9c1903028e5654c7a909114a8fac8449405ddc90cbcf549cf117ab"
+  },
+  "id": "iKWKyTYCSRNfOmvz",
+  "tags": []
+}
