@@ -1,0 +1,587 @@
+{
+  "name": "Automated Hiring Pipeline (Groq) Working",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "includeSpamTrash": false,
+          "q": "=has:attachment (filename:pdf OR filename:docx OR filename:doc)"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2752,
+        128
+      ],
+      "id": "bb96083c-ec06-4c82-ba6d-5659fe083e74",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      },
+      "notes": "Polls Gmail every minute for new emails with PDF/DOCX attachments"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -2528,
+        128
+      ],
+      "id": "2f0144c7-5d7c-40c0-b798-1998a03a49a2"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "messageId": "={{ $json.id }}",
+        "simple": false,
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "name": "Download Resume",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -2272,
+        112
+      ],
+      "id": "0910342b-b99b-42ba-a369-5955d76963db",
+      "webhookId": "76d20fe0-7b5c-4eac-b0bf-4beb8995c30d",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "attachment_0",
+        "options": {}
+      },
+      "name": "Extract Resume Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -2048,
+        112
+      ],
+      "id": "25ecff9f-10b2-46df-94df-0d1764b4936b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the extracted text and email metadata\nconst extractedData = $input.first().json;\nconst emailData = $('Download Resume').first().json;\n\n// Extract email address - handle both object and string formats\nlet candidateEmail = '';\nlet candidateName = 'Unknown';\n\nif (emailData.from && typeof emailData.from === 'object') {\n  // Handle object format\n  if (emailData.from.value && emailData.from.value[0]) {\n    candidateEmail = emailData.from.value[0].address;\n    candidateName = emailData.from.value[0].name || 'Unknown';\n  } else if (emailData.from.text) {\n    // Fallback to text format\n    const emailMatch = emailData.from.text.match(/<(.+?)>/);\n    candidateEmail = emailMatch ? emailMatch[1] : emailData.from.text;\n  }\n} else if (typeof emailData.from === 'string') {\n  // Handle string format\n  const emailMatch = emailData.from.match(/<(.+?)>/);\n  candidateEmail = emailMatch ? emailMatch[1] : emailData.from;\n}\n\n// Get filename from attachments if available\nlet filename = 'resume.pdf';\nif (emailData.attachments && emailData.attachments.length > 0) {\n  filename = emailData.attachments[0].filename || filename;\n}\n\nreturn {\n  json: {\n    resume_text: extractedData.text,\n    sender_email: candidateEmail,\n    sender_name: candidateName,\n    subject: emailData.subject,\n    filename: filename,\n    received_date: emailData.date || new Date().toISOString()\n  }\n};"
+      },
+      "name": "Prepare Resume Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1824,
+        112
+      ],
+      "id": "feb80f79-d1dc-411a-9add-c5eeb369ec00"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "name": "Groq Chat Model - Parser",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1584,
+        336
+      ],
+      "id": "6e2c14a4-e5e4-4d27-b774-463d5ccfefec",
+      "credentials": {
+        "groqApi": {
+          "id": "ozQmlaSuS2wgFKCK",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a resume parser. Extract information and return ONLY a valid JSON object with no additional text.\n\nResume Content:\n{{ $json.resume_text }}\n\nRequirements:\n- Return ONLY the JSON object below\n- NO explanations, NO markdown, NO code blocks\n- Use \"Unknown\" or empty array if information not found\n\n{\n  \"candidate_name\": \"full name from resume\",\n  \"email\": \"email@example.com\",\n  \"phone\": \"phone number\",\n  \"skills\": [\"skill1\", \"skill2\", \"skill3\"],\n  \"years_of_experience\": 0,\n  \"education\": \"degree and university\",\n  \"recent_job_titles\": [\"title1\", \"title2\"]\n}\n\nJSON:"
+      },
+      "name": "Parse Resume with AI",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -1600,
+        112
+      ],
+      "id": "4386c493-d83e-425f-ba70-31761989d9cf"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chainOutput = $input.first().json;\nconst preparedData = $('Prepare Resume Data').first().json;\n\nlet candidateData;\n\ntry {\n  let jsonText = '';\n  \n  // Extract JSON from various possible formats\n  if (chainOutput.output) {\n    jsonText = typeof chainOutput.output === 'string' \n      ? chainOutput.output \n      : JSON.stringify(chainOutput.output);\n  } else if (chainOutput.text) {\n    jsonText = chainOutput.text;\n  } else {\n    jsonText = JSON.stringify(chainOutput);\n  }\n  \n  // Remove markdown code blocks if present\n  jsonText = jsonText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '');\n  \n  // Extract JSON object\n  const jsonMatch = jsonText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    candidateData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n  \n} catch (error) {\n  // Fallback if parsing fails\n  candidateData = {\n    candidate_name: preparedData.sender_name,\n    email: preparedData.sender_email,\n    phone: \"Not provided\",\n    skills: [\"Unable to parse - Manual review needed\"],\n    years_of_experience: 0,\n    education: \"Unable to parse\",\n    recent_job_titles: [\"Unable to parse\"]\n  };\n}\n\n// Use sender email if not found in resume\nif (!candidateData.email || candidateData.email === '' || candidateData.email === 'email@example.com') {\n  candidateData.email = preparedData.sender_email;\n}\n\n// Use sender name if not found\nif (!candidateData.candidate_name || candidateData.candidate_name === 'Unknown' || candidateData.candidate_name === 'full name from resume') {\n  candidateData.candidate_name = preparedData.sender_name;\n}\n\nreturn {\n  json: {\n    candidate_name: candidateData.candidate_name || preparedData.sender_name,\n    email: candidateData.email,\n    phone: candidateData.phone || \"Not provided\",\n    skills: Array.isArray(candidateData.skills) ? candidateData.skills : [],\n    years_of_experience: candidateData.years_of_experience || 0,\n    education: candidateData.education || \"Not provided\",\n    recent_job_titles: Array.isArray(candidateData.recent_job_titles) ? candidateData.recent_job_titles : [],\n    original_subject: preparedData.subject,\n    filename: preparedData.filename,\n    received_date: preparedData.received_date\n  }\n};"
+      },
+      "name": "Clean Candidate Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        112
+      ],
+      "id": "1467faa8-7319-4589-acd5-91e645accbb3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job_role",
+              "name": "job_role",
+              "value": "Backend Developer",
+              "type": "string"
+            },
+            {
+              "id": "required_skills",
+              "name": "required_skills",
+              "value": "Python, FastAPI, SQL, PostgreSQL, AWS, Docker, REST APIs",
+              "type": "string"
+            },
+            {
+              "id": "min_years",
+              "name": "min_experience_years",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "required_education",
+              "name": "required_education",
+              "value": "Bachelor's degree in Computer Science",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "name": "Add Job Requirements",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1024,
+        112
+      ],
+      "id": "bc2ff003-eb50-45d9-9905-90e055793b4a"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "name": "Groq Chat Model - Scorer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        336
+      ],
+      "id": "72fc689a-8eb0-43e8-9046-a190cc31bdd8",
+      "credentials": {
+        "groqApi": {
+          "id": "ozQmlaSuS2wgFKCK",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Evaluate this candidate and return ONLY a valid JSON object.\n\nJob Requirements:\n- Role: {{ $json.job_role }}\n- Required Skills: {{ $json.required_skills }}\n- Minimum Experience: {{ $json.min_experience_years }} years\n\nCandidate Profile:\n- Name: {{ $json.candidate_name }}\n- Skills: {{ Array.isArray($json.skills) ? $json.skills.join(', ') : 'Not provided' }}\n- Experience: {{ $json.years_of_experience }} years\n\nReturn ONLY this JSON structure with NO additional text:\n\n{\n  \"overall_score\": 85,\n  \"skills_match_percentage\": 80,\n  \"experience_adequate\": true,\n  \"key_strengths\": [\"strength1\", \"strength2\"],\n  \"gaps\": [\"gap1\", \"gap2\"],\n  \"recommendation\": \"Brief one sentence recommendation\"\n}\n\nJSON:"
+      },
+      "name": "Score Candidate with AI",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        -800,
+        112
+      ],
+      "id": "12c6b581-62ad-456a-9ff3-a0b38ca9ce5a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const chainOutput = $input.first().json;\nconst previousData = $('Add Job Requirements').first().json;\n\nlet scoreData;\n\ntry {\n  let jsonText = '';\n  \n  // Extract JSON from various possible formats\n  if (chainOutput.output) {\n    jsonText = typeof chainOutput.output === 'string' \n      ? chainOutput.output \n      : JSON.stringify(chainOutput.output);\n  } else if (chainOutput.text) {\n    jsonText = chainOutput.text;\n  } else {\n    jsonText = JSON.stringify(chainOutput);\n  }\n  \n  // Remove markdown code blocks if present\n  jsonText = jsonText.replace(/```json\\n?/g, '').replace(/```\\n?/g, '');\n  \n  // Extract JSON object\n  const jsonMatch = jsonText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    scoreData = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n  \n} catch (error) {\n  // Fallback scoring if AI fails\n  scoreData = {\n    overall_score: 50,\n    skills_match_percentage: 50,\n    experience_adequate: false,\n    key_strengths: [\"Resume received\"],\n    gaps: [\"Unable to parse automatically\"],\n    recommendation: \"Manual review required\"\n  };\n}\n\nreturn {\n  json: {\n    ...previousData,\n    overall_score: scoreData.overall_score || 50,\n    skills_match_percentage: scoreData.skills_match_percentage || 50,\n    experience_adequate: scoreData.experience_adequate || false,\n    key_strengths: Array.isArray(scoreData.key_strengths) ? scoreData.key_strengths : [\"Not available\"],\n    gaps: Array.isArray(scoreData.gaps) ? scoreData.gaps : [\"Not available\"],\n    recommendation: scoreData.recommendation || \"Manual review required\",\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Merge Score Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        112
+      ],
+      "id": "d9186cde-db84-4013-9e2c-9eed1073e16d"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.overall_score }}",
+              "operation": "largerEqual",
+              "value2": 60
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Score >= 60?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        112
+      ],
+      "id": "e647b53f-d2b2-461c-9bbd-ed516f60a862"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=Application Update - {{ $json.job_role }}",
+        "message": "=Hi {{ $json.candidate_name }},\n\nThank you for applying for the {{ $json.job_role }} position.\n\nAfter review, we've decided not to move forward at this time. We appreciate your interest and wish you success in your job search.\n\nBest regards,\nHiring Team",
+        "options": {}
+      },
+      "name": "Rejection Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        208
+      ],
+      "id": "938b70db-f2ec-4a72-833a-5c6be4dcd8f4",
+      "webhookId": "808bf857-587f-4a2e-ab74-8f713a14a883",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "=🎉 Interview Invitation - {{ $json.job_role }}",
+        "message": "=Hi {{ $json.candidate_name }},\n\nWe're impressed with your profile! \n\n**Your Score:** {{ $json.overall_score }}/100\n**Strengths:** {{ Array.isArray($json.key_strengths) ? $json.key_strengths.join(', ') : 'Various strengths identified' }}\n\n**Next Steps:**\nSchedule your interview: https://calendly.com/yourcompany\n\nLooking forward to speaking with you!\n\nBest,\nHiring Team",
+        "options": {}
+      },
+      "name": "Shortlist Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d957fcff-4f5f-4006-b8ef-1ba8110f3a52",
+      "webhookId": "ce743eed-2a58-4be5-bb4e-8b56ce727640",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "name": "Groq Chat Model - Questions",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        304,
+        240
+      ],
+      "id": "a96a6de3-0c21-43ab-8f55-d2bcaaf69ae4",
+      "credentials": {
+        "groqApi": {
+          "id": "ozQmlaSuS2wgFKCK",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate interview questions for:\n\n**Candidate:** {{ $('Score >= 60?').item.json.candidate_name }}\n**Role:** {{ $('Score >= 60?').item.json.job_role }}\n**Skills:** {{ Array.isArray($json.skills) ? $json.skills.join(', ') : 'Skills to be discussed' }}\n**Experience:**{{ $('Score >= 60?').item.json.min_experience_years }} years\n\nCreate:\n1. 5 technical questions\n2. 3 behavioral questions  \n3. 2 scenario questions\n\nFormat in Markdown with:\n- The question\n- Why asking it\n- What to listen for"
+      },
+      "name": "Generate Interview Questions",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [
+        224,
+        0
+      ],
+      "id": "6f2acba6-7c17-459e-b504-2ba73b154287"
+    },
+    {
+      "parameters": {
+        "sendTo": "kodachadritrek57@gmail.com",
+        "subject": "=Interview Questions - {{ $('Score >= 60?').item.json.candidate_name }} ({{ $('Score >= 60?').item.json.overall_score }}/100)",
+        "message": "=**Candidate:{{ $('Score >= 60?').item.json.candidate_name }}\n**Email:** {{ $('Score >= 60?').item.json.email }}\n**Score:** {{ $('Score >= 60?').item.json.overall_score }}/100\n**Recommendation:** {{ $('Score >= 60?').item.json.recommendation }}\n\n---\n\n{{ $('Generate Interview Questions').first().json.text }}",
+        "options": {}
+      },
+      "name": "Send Questions to HR",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        576,
+        0
+      ],
+      "id": "0e1b602d-9e00-44f6-8a3b-ccca82f5f7ca",
+      "webhookId": "3f4c5c4d-76a6-4160-8faf-056e19487dd0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [
+          {
+            "node": "Download Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Resume": {
+      "main": [
+        [
+          {
+            "node": "Extract Resume Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Resume Text": {
+      "main": [
+        [
+          {
+            "node": "Prepare Resume Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Resume Data": {
+      "main": [
+        [
+          {
+            "node": "Parse Resume with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model - Parser": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Parse Resume with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Resume with AI": {
+      "main": [
+        [
+          {
+            "node": "Clean Candidate Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Candidate Data": {
+      "main": [
+        [
+          {
+            "node": "Add Job Requirements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Job Requirements": {
+      "main": [
+        [
+          {
+            "node": "Score Candidate with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model - Scorer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Score Candidate with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Candidate with AI": {
+      "main": [
+        [
+          {
+            "node": "Merge Score Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Score Data": {
+      "main": [
+        [
+          {
+            "node": "Score >= 60?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score >= 60?": {
+      "main": [
+        [
+          {
+            "node": "Shortlist Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rejection Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shortlist Email": {
+      "main": [
+        [
+          {
+            "node": "Generate Interview Questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model - Questions": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Interview Questions",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Interview Questions": {
+      "main": [
+        [
+          {
+            "node": "Send Questions to HR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e7e878c7-07f5-4822-9bcf-0fcbca7934c6",
+  "meta": {
+    "instanceId": "872a161d4a6de4b20f46333ef3ee1089a2ffe1e457ffa89444b5b02d81e4196b"
+  },
+  "id": "j021biiFWkUyOjzL",
+  "tags": []
+}

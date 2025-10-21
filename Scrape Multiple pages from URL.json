@@ -1,0 +1,552 @@
+{
+  "name": "Scrape Multiple pages from URL",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v2/crawl",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"url\": \"https://onehealthassist.com/\",\n  \"limit\": 10,\n  \"maxDiscoveryDepth\": 2,\n  \"excludePaths\": [\"/admin\", \"/login\"],\n  \"scrapeOptions\": {\n    \"formats\": [\"markdown\"],\n    \"onlyMainContent\": true,\n    \"blockAds\": true,\n    \"removeBase64Images\": true,\n    \"excludeTags\": [\"img\", \"svg\", \"picture\", \"video\", \"audio\", \"canvas\", \"iframe\"]\n  }\n}",
+        "options": {}
+      },
+      "id": "c8a6f007-74c4-4953-9aeb-215f7cd62027",
+      "name": "Start Firecrawl Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -608,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZAdeKiaK5pNtMwNO",
+          "name": "FireCrawl new"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "id": "cfec7b85-feca-4167-a58f-a97ac833c5ef",
+      "name": "Wait for Crawl to Start",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -384,
+        240
+      ],
+      "webhookId": "b597f4c0-b47f-4d04-b6db-f81b151a5600"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.firecrawl.dev/v2/crawl/{{ $('Start Firecrawl Job').item.json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "ac0f73de-b647-4cad-94b5-3a10330b3ed2",
+      "name": "Check Crawl Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        -160,
+        240
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ZAdeKiaK5pNtMwNO",
+          "name": "FireCrawl new"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "=completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2d179d3c-c3db-45d0-97f8-c7b4bd8b9cf7",
+      "name": "Is Crawl Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        64,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "id": "ec331824-532a-4734-aa70-72edb8674e4f",
+      "name": "Wait Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        64,
+        400
+      ],
+      "webhookId": "99897ede-61c7-458e-9232-9b7b9562a0a3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "5c260c04-f660-4ff3-adc0-885e036aad65",
+      "name": "Split Crawled Pages",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        224,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle failed crawl - extract error information\nconst response = $input.first().json;\n\nconst errorInfo = {\n  status: response.status || 'unknown',\n  message: response.error || 'Crawl did not complete successfully',\n  current: response.current || 0,\n  total: response.total || 0,\n  creditsUsed: response.creditsUsed || 0,\n  expiresAt: response.expiresAt || '',\n  data: response.data || []\n};\n\n// If there's partial data, we can still process it\nif (errorInfo.data && errorInfo.data.length > 0) {\n  return {\n    hasPartialData: true,\n    ...errorInfo\n  };\n}\n\n// Otherwise, return error information\nreturn {\n  hasPartialData: false,\n  ...errorInfo\n};"
+      },
+      "id": "d2cb9afb-4f90-47de-a63f-f723d36b4774",
+      "name": "Handle Crawl Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "condition1",
+              "leftValue": "={{ $json.hasPartialData }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b123686d-23a6-49a4-a7b0-2fa3b8da7acd",
+      "name": "Has Partial Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        704,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "67645688-559a-4b50-aea9-648a7e9ff9b2",
+      "name": "Split Partial Data",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        304
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        240
+      ],
+      "id": "6c8cdfb4-2743-4d00-8413-74c7bf25ffe6",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Process each crawled page data\nconst pageData = $input.item.json;\n\n// Return the extracted data directly\nreturn {\n  URL: pageData.metadata?.sourceURL || pageData.metadata?.url || '',\n  Title: pageData.metadata?.title || '',\n  'Meta Description': pageData.metadata?.description || pageData.metadata?.ogDescription || '',\n  'Content / Body Text': pageData.markdown || pageData.content || ''\n};"
+      },
+      "id": "c0840391-26fa-41fc-bb87-edee6a5b6306",
+      "name": "Process Page Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        32
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the data array from Firecrawl response\nconst response = $input.first().json;\n\n// The response is an array with one object containing the data\nconst crawlResult = Array.isArray(response) ? response[0] : response;\n\n// Return the data array\nreturn crawlResult.data.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        32
+      ],
+      "id": "4c06c780-7b19-46ac-a126-925d55f34aee",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format all page data for Google Docs\nconst items = $input.all();\n\n// Build a well-structured document\nlet documentContent = '# One Health Assist - Website Content\\n\\n';\ndocumentContent += `Total Pages Scraped: ${items.length}\\n`;\ndocumentContent += `Generated on: ${new Date().toLocaleString()}\\n\\n`;\ndocumentContent += '---\\n\\n';\n\nitems.forEach((item, index) => {\n  const data = item.json;\n  \n  documentContent += `## Page ${index + 1}\\n\\n`;\n  documentContent += `**URL:** ${data.URL}\\n\\n`;\n  documentContent += `**Title:** ${data.Title}\\n\\n`;\n  \n  if (data['Meta Description']) {\n    documentContent += `**Meta Description:** ${data['Meta Description']}\\n\\n`;\n  }\n  \n  documentContent += `**Content:**\\n\\n${data['Content / Body Text']}\\n\\n`;\n  documentContent += '---\\n\\n';\n});\n\nreturn {\n  documentContent: documentContent,\n  title: `OneHealthAssist_Scraped_${new Date().toISOString().split('T')[0]}`\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        32
+      ],
+      "id": "a1746c11-6edf-4059-82d0-fa2efd059590",
+      "name": "Format for Google Docs"
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.documentContent }}",
+        "options": {
+          "requireSpaceBeforeHeadingText": true,
+          "noHeaderId": true,
+          "tables": true
+        }
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        1024,
+        32
+      ],
+      "id": "a41af69a-6c3e-4e18-9dcd-15e8fc0eb73a",
+      "name": "Markdown"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e7ee03ac-13e3-4fca-a7bc-57c8fc56dc42",
+              "name": "document_name",
+              "value": "=Onehealthassist",
+              "type": "string"
+            },
+            {
+              "id": "48a07ef2-ae46-4bfc-aa7e-d92a74ef46d6",
+              "name": "html_content",
+              "value": "={{ $json.data }}",
+              "type": "string"
+            },
+            {
+              "id": "22b02fba-ba72-423a-b92f-1191a183a554",
+              "name": "drive_folder_id",
+              "value": "1NzczbtHaCdax1gy9NUUC8EQvrDtphuIC",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1232,
+        32
+      ],
+      "id": "1936232b-0b4b-4e47-ae91-c7746ba583eb",
+      "name": "set_fields",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple HTML to Google Drive converter with link preservation\nconst boundary = 'divider';\nconst docName = $input.first().json.document_name;\nconst folderId = $input.first().json.drive_folder_id;\nconst htmlContent = $input.first().json.html_content;\n\n// Process HTML to ensure links are preserved\nfunction preserveLinks(htmlContent) {\n    // Ensure all links have proper attributes for Google Drive\n    let processedHtml = htmlContent;\n    \n    // Fix any malformed or incomplete link tags\n    processedHtml = processedHtml.replace(/<a\\s+href=[\"']([^\"']+)[\"'][^>]*>(.*?)<\\/a>/gi, '<a href=\"$1\">$2</a>');\n    \n    // Ensure links have proper protocol\n    processedHtml = processedHtml.replace(/<a\\s+href=[\"'](?!https?:\\/\\/|mailto:|tel:)([^\"']+)[\"']>/gi, '<a href=\"https://$1\">');\n    \n    return processedHtml;\n}\n\nconst metadata = JSON.stringify({\n  name: docName,\n  mimeType: \"application/vnd.google-apps.document\",\n  parents: [folderId]\n});\n\n// Process the HTML content to preserve links\nconst processedHtmlContent = preserveLinks(htmlContent);\n\nconst htmlWithStyles = `\n<!DOCTYPE html>\n<html>\n<head>\n  <meta charset=\"UTF-8\">\n  <style>\n    /* Add bottom margin to block elements for spacing */\n    p,\n    ul,\n    ol,\n    table,\n    h1,\n    h2,\n    h3,\n    h4,\n    h5,\n    h6 {\n      margin-bottom: 10pt;\n    }\n    h2 {\n      margin-top: 20pt;\n    }\n    /* Prevent margin collapse issues or excessive space inside lists */\n    li {\n       margin-bottom: 2pt; /* Optional: small space between list items */\n    }\n    /* Ensure links are styled properly for Google Drive */\n    a {\n      color: #1155cc;\n      text-decoration: underline;\n    }\n    /* Remove margin from the last child within common containers if needed */\n    /* This might be overly aggressive, test without it first */\n    /*\n    body > *:last-child,\n    li > *:last-child {\n       margin-bottom: 0;\n    }\n    */\n  </style>\n</head>\n<body>\n  ${processedHtmlContent}\n</body>\n</html>\n`;\n\n// Construct the body with literal \\r\\n ONLY\nlet body = `--${boundary}\\r\\n`;\nbody += `Content-Type: application/json; charset=UTF-8\\r\\n`;\nbody += `\\r\\n`; // Blank line\nbody += `${metadata}\\r\\n`;\nbody += `--${boundary}\\r\\n`;\nbody += `Content-Type: text/html\\r\\n`;\nbody += `\\r\\n`; // Blank line\nbody += `${htmlWithStyles}\\r\\n`; // Add the HTML content\nbody += `--${boundary}--\\r\\n`; // Final boundary\n\nreturn {\n  rawData: body \n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        32
+      ],
+      "id": "2b241df5-d4a6-47c9-b6e3-932b9bd85cf2",
+      "name": "Prepare_Request"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "uploadType",
+              "value": "multipart"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "multipart/related; boundary=divider",
+        "body": "={{ $json.rawData}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1648,
+        32
+      ],
+      "id": "283005fe-eea9-4dc8-9205-895b11bae6e2",
+      "name": "CreateGoogleDoc1",
+      "notesInFlow": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "JiHGTQ9l19Td68bI",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start Firecrawl Job": {
+      "main": [
+        [
+          {
+            "node": "Wait for Crawl to Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Crawl to Start": {
+      "main": [
+        [
+          {
+            "node": "Check Crawl Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Crawl Status": {
+      "main": [
+        [
+          {
+            "node": "Is Crawl Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Crawl Complete?": {
+      "main": [
+        [
+          {
+            "node": "Split Crawled Pages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Crawl Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Check Crawl Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Crawled Pages": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Crawl Error": {
+      "main": [
+        [
+          {
+            "node": "Has Partial Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Partial Data?": {
+      "main": [
+        [
+          {
+            "node": "Split Partial Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Partial Data": {
+      "main": [
+        [
+          {
+            "node": "Process Page Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Start Firecrawl Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Page Data": {
+      "main": [
+        [
+          {
+            "node": "Format for Google Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Process Page Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format for Google Docs": {
+      "main": [
+        [
+          {
+            "node": "Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown": {
+      "main": [
+        [
+          {
+            "node": "set_fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_fields": {
+      "main": [
+        [
+          {
+            "node": "Prepare_Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare_Request": {
+      "main": [
+        [
+          {
+            "node": "CreateGoogleDoc1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "894f777f-9209-4506-a216-8b39088b8d1d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "63f19c70107ec04238a9e4559290b8eada5811eb84e128599ba97390169c4163"
+  },
+  "id": "vjpqiL9fEROiveM1",
+  "tags": []
+}

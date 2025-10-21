@@ -1,0 +1,290 @@
+{
+  "name": "Telegram Text message to Email (Free)",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "01f24145-3405-490e-872a-f8265aed6a7e",
+      "name": "Telegram Trigger (Polling)",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1344,
+        112
+      ],
+      "webhookId": "eb517469-cf4e-424e-82e4-d50aa8eaa76b",
+      "credentials": {
+        "telegramApi": {
+          "id": "CwQkikFdhBTeFAPF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "voice-check",
+              "leftValue": "={{ $json.message.text !== undefined && $json.message.text !== null }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "not-bot",
+              "leftValue": "={{ $json.message.from.is_bot }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d64bc23d-e982-4b38-bc9a-04a75ff118ed",
+      "name": "Check if Voice Message",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.chat.id }}",
+        "text": "Please send a voice message with:\n\n📧 Recipient email address\n📝 Subject\n✉️ Message body\n\nExample: \"Send email to john at gmail dot com, subject meeting reminder, message hi john this is a reminder about our meeting tomorrow at 2pm\"",
+        "additionalFields": {}
+      },
+      "id": "50dfafed-db38-44fe-999b-0a57709ce4b7",
+      "name": "Send Help Message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        -944,
+        272
+      ],
+      "webhookId": "cda609ed-6358-49bb-bb7f-2245c011f513",
+      "credentials": {
+        "telegramApi": {
+          "id": "CwQkikFdhBTeFAPF",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-goog-api-key",
+              "value": "AIzaSyAMoC11onXVY4OmRAGHtS8Z4DE9CpkgFug"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"text\": \"You are an email data extractor. Extract the email information from this voice transcription and return ONLY a valid JSON object with these fields:\\n\\n{\\n  \\\"to\\\": \\\"recipient email address\\\",\\n  \\\"subject\\\": \\\"email subject\\\",\\n  \\\"body\\\": \\\"email message body\\\"\\n}\\n\\nIMPORTANT: \\n- Return ONLY the JSON object, no other text before or after\\n- If the user says 'at' or 'dot', convert to @ and . symbols\\n- Example: 'john at gmail dot com' becomes 'john@gmail.com'\\n\\nTranscription: {{ $json.message.text }}\\n\\nReturn only valid JSON:\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "3b32e5ea-1d42-48ec-8681-7d61b34886b4",
+      "name": "Extract Email Data (DeepSeek)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -800,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nconst content = response.candidates[0].content.parts[0].text;\n\n// Log the actual content to see what we're dealing with\nconsole.log('Raw content:', content);\n\n// Find the first { and last }\nconst startIndex = content.indexOf('{');\nconst endIndex = content.lastIndexOf('}');\n\nconsole.log('Start index:', startIndex);\nconsole.log('End index:', endIndex);\nconsole.log('Extracted:', content.substring(startIndex, endIndex + 1));\n\nconst jsonString = content.substring(startIndex, endIndex + 1);\nconst emailData = JSON.parse(jsonString);\n\nreturn {\n  json: emailData\n};"
+      },
+      "id": "777e4747-ea13-40a9-bd26-29fdefb9eb5e",
+      "name": "Parse Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-goog-api-key",
+              "value": "AIzaSyAMoC11onXVY4OmRAGHtS8Z4DE9CpkgFug"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"text\": \"You are a professional email writer. Rewrite the following email to be clear, concise, professional, and well-structured:\\n\\n{{ $json.body }}\"\n        }\n      ]\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "id": "3a8696ef-0133-4010-bcd5-32b55831748d",
+      "name": "Optimize Email Body (DeepSeek)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -336,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.item.json;\nconst optimizedBody = response.candidates[0].content.parts[0].text.trim();\nconst emailData = $node[\"Parse Email Data\"].json;\n\nreturn {\n  json: {\n    to: emailData.to,\n    subject: emailData.subject,\n    body: optimizedBody,\n    chatId: emailData.chatId\n  }\n};"
+      },
+      "id": "f50ee94b-52f3-4d8d-a029-7f4ff6511382",
+      "name": "Prepare Final Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        160,
+        -32
+      ],
+      "id": "1e995a6f-b4d8-4772-9360-0b6f8f993352",
+      "name": "Send a message",
+      "webhookId": "bc402d8b-07ee-4243-b116-da34afef356c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OmXDt7yqbjgyqrwB",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger (Polling)": {
+      "main": [
+        [
+          {
+            "node": "Check if Voice Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Voice Message": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data (DeepSeek)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data (DeepSeek)": {
+      "main": [
+        [
+          {
+            "node": "Parse Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Email Data": {
+      "main": [
+        [
+          {
+            "node": "Optimize Email Body (DeepSeek)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Optimize Email Body (DeepSeek)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Email": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "31906c40-f999-4b49-bf0a-e44e644e0ceb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "872a161d4a6de4b20f46333ef3ee1089a2ffe1e457ffa89444b5b02d81e4196b"
+  },
+  "id": "RLfPVkrh3HwVJGWI",
+  "tags": []
+}
